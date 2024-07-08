@@ -9,7 +9,7 @@
 CRGB leds[NUM_LEDS];
 
 #define UPDATE_DELAY_MIN 10
-#define UPDATE_DELAY_MAX 5000
+#define UPDATE_DELAY_MAX 1000
 
 #define COLOR_POT A0
 #define SPEED_POT A1
@@ -61,7 +61,9 @@ void hue_to_rgb(float hue, uint8_t *r, uint8_t *g, uint8_t *b) {
 }
 
 float input_to_float(int pin, float min, float max) {
-  return (((float)(POT_MAX - analogRead(pin)) / POT_MAX) * (max - min)) + min;
+  int reading = analogRead(pin);
+  float pcnt = (float)reading / POT_MAX;
+  return (pcnt * (max - min)) + min;  
 }
 
 void loop() {
