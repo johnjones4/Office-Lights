@@ -8,15 +8,25 @@
 #define COLOR_ORDER GRB
 CRGB leds[NUM_LEDS];
 
-#define UPDATE_DELAY 50
+#define UPDATE_DELAY_MIN 10
+#define UPDATE_DELAY_MAX 5000
 
 #define COLOR_POT A0
 #define SPEED_POT A1
 #define MODE_SWITCH 2
 #define POT_MAX 1023
 
+enum Mode {
+  ChaseUp,
+  ChaseDown,
+  Bounce,
+  Solid
+};
+
 unsigned long lastUpdate = 0;
 int currentLight = 0;
+enum Mode currentMode = ChaseUp;
+int delta = 1;
 
 void setup() {
   Serial.begin(9600);
@@ -50,18 +60,47 @@ void hue_to_rgb(float hue, uint8_t *r, uint8_t *g, uint8_t *b) {
   *b = (uint8_t)(blue * 255.0f);
 }
 
-float input_to_float(int pin) {
-  return (float)(POT_MAX - analogRead(pin)) / POT_MAX;
+float input_to_float(int pin, float min, float max) {
+  return (((float)(POT_MAX - analogRead(pin)) / POT_MAX) * (max - min)) + min;
 }
 
 void loop() {
-  if (millis() - lastUpdate > UPDATE_DELAY) {
-    float colorValue = input_to_float(COLOR_POT);
+  unsigned long delay = (unsigned long)input_to_float(SPEED_POT, UPDATE_DELAY_MIN, UPDATE_DELAY_MAX);
+  if (millis() - lastUpdate > delay) {
+    lastUpdate = millis();
+    float colorValue = input_to_float(COLOR_POT, 0, 1);
     CRGB nextColor;
     hue_to_rgb(colorValue, &nextColor.r, &nextColor.g, &nextColor.b);
-    leds[currentLight] = nextColor;
-    lastUpdate = millis();
-    currentLight = (currentLight + 1) % NUM_LEDS;
+    switch (currentMode)
+    {
+    case ChaseUp:
+      delta = 1;
+      break;
+    case ChaseDown:
+      delta = -1;
+      break;
+    case Bounce:
+      if (currentLight == 0 && delta == -1) {
+        delta = 1;
+      } else if (currentLight == NUM_LEDS -1 && delta == 1) {
+        delta = -1;
+      }
+      break;
+    case Solid:
+      delta = 0;
+      currentLight = 0;
+      for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = nextColor;
+      }
+    }
+    if (delta != 0) {
+      leds[currentLight] = CRGB::Black;
+      currentLight--;
+      if (currentLight < 0) {
+        currentLight = NUM_LEDS - 1;
+      }
+      leds[currentLight] = nextColor;
+    }
     FastLED.show();
   }
 }
