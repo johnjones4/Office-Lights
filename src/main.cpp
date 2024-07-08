@@ -15,6 +15,7 @@ CRGB leds[NUM_LEDS];
 #define SPEED_POT A1
 #define MODE_SWITCH 2
 #define POT_MAX 1023
+#define TRAIL_LENGTH 3
 
 enum Mode {
   ChaseUp,
@@ -46,18 +47,25 @@ float hue_to_rgb(float p, float q, float t) {
 }
 
 // Function to convert hue to RGB
-void hue_to_rgb(float hue, uint8_t *r, uint8_t *g, uint8_t *b) {
-  float q = 1.0f;
-  float p = 0.0f;
+void hsl_to_rgb(float hue, float lightness, uint8_t *r, uint8_t *g, uint8_t *b) {
+    float q, p;
 
-  float red = hue_to_rgb(p, q, hue + 1.0f / 3.0f);
-  float green = hue_to_rgb(p, q, hue);
-  float blue = hue_to_rgb(p, q, hue - 1.0f / 3.0f);
+    if (lightness < 0.5f) {
+        q = lightness * (1.0f + 1.0f);
+    } else {
+        q = lightness + 1.0f - lightness * 1.0f;
+    }
 
-  // Convert from float [0, 1] to int [0, 255]
-  *r = (uint8_t)(red * 255.0f);
-  *g = (uint8_t)(green * 255.0f);
-  *b = (uint8_t)(blue * 255.0f);
+    p = 2.0f * lightness - q;
+
+    float red = hue_to_rgb(p, q, hue + 1.0f / 3.0f);
+    float green = hue_to_rgb(p, q, hue);
+    float blue = hue_to_rgb(p, q, hue - 1.0f / 3.0f);
+
+    // Convert from float [0, 1] to int [0, 255]
+    *r = (uint8_t)(red * 255.0f);
+    *g = (uint8_t)(green * 255.0f);
+    *b = (uint8_t)(blue * 255.0f);
 }
 
 float input_to_float(int pin, float min, float max) {
@@ -66,13 +74,26 @@ float input_to_float(int pin, float min, float max) {
   return (pcnt * (max - min)) + min;  
 }
 
+void update_led(int index, CRGB color) {
+  int realIndex = index;
+  if (index < 0) {
+    realIndex = NUM_LEDS + index;
+  } else if (index >= NUM_LEDS) {
+    realIndex = index - NUM_LEDS;
+  }
+  leds[realIndex] = color;
+}
+
 void loop() {
   unsigned long delay = (unsigned long)input_to_float(SPEED_POT, UPDATE_DELAY_MIN, UPDATE_DELAY_MAX);
   if (millis() - lastUpdate > delay) {
     lastUpdate = millis();
     float colorValue = input_to_float(COLOR_POT, 0, 1);
-    CRGB nextColor;
-    hue_to_rgb(colorValue, &nextColor.r, &nextColor.g, &nextColor.b);
+    CRGB nextColor[TRAIL_LENGTH];
+    for (int i = 0; i < TRAIL_LENGTH; i++) {
+      float lightness = ((float)(TRAIL_LENGTH - i) / (float)TRAIL_LENGTH) * 0.9 + 0.1;
+      hsl_to_rgb(colorValue, lightness, &nextColor[i].r, &nextColor[i].g, &nextColor[i].b);
+    }
     switch (currentMode)
     {
     case ChaseUp:
@@ -92,7 +113,7 @@ void loop() {
       delta = 0;
       currentLight = 0;
       for (int i = 0; i < NUM_LEDS; i++) {
-        leds[i] = nextColor;
+        update_led(i, nextColor[0]);
       }
     }
     if (delta != 0) {
@@ -101,7 +122,9 @@ void loop() {
       if (currentLight < 0) {
         currentLight = NUM_LEDS - 1;
       }
-      leds[currentLight] = nextColor;
+      for (int i = 0; i < TRAIL_LENGTH; i++) {
+        update_led(currentLight - (i * delta), nextColor[i]);
+      }
     }
     FastLED.show();
   }
