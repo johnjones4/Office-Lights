@@ -117,7 +117,9 @@ void loop() {
       }
     }
     if (delta != 0) {
-      leds[currentLight] = CRGB::Black;
+      for (int i = 0; i < TRAIL_LENGTH; i++) {
+        update_led(currentLight - (i * delta), CRGB::Black);
+      }
       currentLight += delta;
       if (currentLight < 0) {
         currentLight = NUM_LEDS - 1;
