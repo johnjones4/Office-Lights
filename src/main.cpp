@@ -11,9 +11,13 @@ CRGB leds[NUM_LEDS];
 #define UPDATE_DELAY_MIN 10
 #define UPDATE_DELAY_MAX 1000
 
+#define COLOR_INC_MIN 00.1
+#define COLOR_INC_MAX 0.5
+
 #define COLOR_POT A0
 #define SPEED_POT A1
 #define MODE_SWITCH 2
+#define COLOR_SWITCH 3
 #define POT_MAX 1023
 #define TRAIL_LENGTH 3
 
@@ -28,10 +32,12 @@ unsigned long lastUpdate = 0;
 int currentLight = 0;
 enum Mode currentMode = ChaseUp;
 int delta = 1;
+float colorTick = 0;
 
 void setup() {
   Serial.begin(9600);
   pinMode(MODE_SWITCH, INPUT_PULLUP);
+  pinMode(COLOR_SWITCH, INPUT_PULLUP);
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
   FastLED.setBrightness(  BRIGHTNESS );
   Serial.println("Ready");
@@ -85,10 +91,18 @@ void update_led(int index, CRGB color) {
 }
 
 void loop() {
+  float colorValue;
+
+  if (digitalRead(COLOR_SWITCH) == LOW) {
+    colorTick += input_to_float(COLOR_POT, COLOR_INC_MIN, COLOR_INC_MAX);
+    colorValue = sin(colorTick);
+  } else {
+    colorValue = input_to_float(COLOR_POT, 0, 1);
+  }
+
   unsigned long delay = (unsigned long)input_to_float(SPEED_POT, UPDATE_DELAY_MIN, UPDATE_DELAY_MAX);
   if (millis() - lastUpdate > delay) {
     lastUpdate = millis();
-    float colorValue = input_to_float(COLOR_POT, 0, 1);
     CRGB nextColor[TRAIL_LENGTH];
     for (int i = 0; i < TRAIL_LENGTH; i++) {
       float lightness = ((float)(TRAIL_LENGTH - i) / (float)TRAIL_LENGTH) * 0.9 + 0.1;
