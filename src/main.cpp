@@ -11,8 +11,9 @@ CRGB leds[NUM_LEDS];
 #define UPDATE_DELAY_MIN 10
 #define UPDATE_DELAY_MAX 1000
 
-#define COLOR_INC_MIN 00.1
-#define COLOR_INC_MAX 0.5
+#define COLOR_INC_DELAY 100
+#define COLOR_INC_MIN 0.001
+#define COLOR_INC_MAX 0.05
 
 #define INPUT_DEBOUNCE 500
 #define COLOR_POT A0
@@ -32,6 +33,7 @@ enum Mode {
 
 unsigned long lastUpdate = 0;
 unsigned long lastButtonDown = 0;
+unsigned long lastColorInc = 0;
 int currentLight = 0;
 enum Mode currentMode = ChaseUp;
 int delta = 1;
@@ -102,10 +104,11 @@ void loop() {
   float colorValue;
 
   if (digitalRead(COLOR_SWITCH) == LOW) {
-    colorTick += input_to_float(COLOR_POT, COLOR_INC_MIN, COLOR_INC_MAX);
-    colorValue = sin(colorTick);
-  } else {
     colorValue = input_to_float(COLOR_POT, 0, 1);
+  } else if (millis() - lastColorInc > COLOR_INC_DELAY) {
+    lastColorInc = millis();
+    colorTick += (1 - input_to_float(COLOR_POT, 0, 1)) * (COLOR_INC_MAX - COLOR_INC_MIN) + COLOR_INC_MIN;
+    colorValue = sin(colorTick)/2 + 0.5;
   }
 
   if (digitalRead(MODE_SWITCH) == LOW && millis() - lastButtonDown > INPUT_DEBOUNCE) {
